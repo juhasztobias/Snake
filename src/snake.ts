@@ -10,6 +10,7 @@ type Direction = 'up' | 'down' | 'left' | 'right';
 type Snake = {
     head: SnakeBody,
     tail: SnakeBody,
+
     length: number,
     direction: Direction,
 
@@ -17,69 +18,71 @@ type Snake = {
     changeDirection(direction: Direction): void // Change the direction of the snake
 }
 
-type SnakeBody = {
-    x: number, 
+type Block = {
+    x: number,
     y: number,
 
-    next: SnakeBody | null,
-    prev: SnakeBody | null
+    type: 'snake' | 'fruit'
 }
 
-type Fruit = { x: number, y: number }
+type SnakeBody = Block & { type: 'snake', next: SnakeBody | null }
+type Fruit = Block & { type: 'fruit' }
 
-let isSnakeBody = (obj: any): obj is SnakeBody =>  obj && obj.x !== undefined && obj.y !== undefined && obj.next !== undefined && obj.prev !== undefined;
-let isFruit = (obj: any): obj is Fruit => obj && obj.x !== undefined && obj.y !== undefined && !isSnakeBody(obj);
 
-type GameMap = (Fruit | SnakeBody | null)[][];
+
+
+let isSnakeBody = (obj: any): obj is Block =>  obj && obj.type === 'snake';
+let isFruit = (obj: any): obj is Block => obj && obj.type === 'fruit';
+
+type GameMap = (Block | null)[][];
 
 let gameMap : GameMap = Array.from({length: WIDTH }, () => Array.from({length: HEIGHT}, () => null));
 
-function buildSnake(position: {x: number, y: number} = { x: Math.floor(WIDTH/2), y: Math.floor(HEIGHT/2)}, direction: Direction = 'right') : Snake{
+function buildSnake(position: {x: number, y: number} = { x: Math.floor(WIDTH/2), y: Math.floor(HEIGHT/2)}) : Snake{
     
     let arr: SnakeBody[] = [];
-    for(let i = 0; i < 3; i++) arr.push({x: position.x + i, y: position.y, next: null, prev: arr[i-1] || null});
-    for(let i = 0; i < 3; i++) arr[i].next = arr[i+1] || null;
+    for(let i = 0; i < 3; i++){
+        arr.push({ x: position.x + i, y: position.y, type: 'snake', next: null });
+        gameMap[position.x + i][position.y] = arr[i];   // Agrego la serpiente al mapa.
+    }
+    for(let i = 0; i < 2; i++) arr[i].next = arr[i+1];
+
 
     return {
         head: arr[2],
         tail: arr[0],
-        direction: direction,
+        direction: 'right',
 
         length: 3,
         move: function() {
-    
 
-            let newHead: SnakeBody;
-            if(this.direction == "right") newHead = {x: this.head.x + 1, y: this.head.y, next: null, prev: null};
-            else if(this.direction == "left") newHead = {x: this.head.x - 1, y: this.head.y, next: null, prev: null};
-            else if(this.direction == "up") newHead = {x: this.head.x, y: this.head.y - 1, next: null, prev: null};
-            else if(this.direction == "down") newHead = {x: this.head.x, y: this.head.y + 1, next: null, prev: null};
+            let newHead: SnakeBody = { x: this.head.x, y: this.head.y, type: 'snake', next: null };
+            if(this.direction == "right") newHead.x++;
+            else if(this.direction == "left") newHead.x--;
+            else if(this.direction == "up") newHead.y--;
+            else if(this.direction == "down") newHead.y++;
             else throw new Error('Invalid direction');
 
-            
             if(isSnakeBody(gameMap[newHead.x][newHead.y])) return GAME_OVER = true;
-            if(isFruit(gameMap[newHead.x][newHead.y])) {
-                this.tail = { x: this.tail.x, y: this.tail.y, next: this.tail, prev: null };
-                
-                EXISTING_FRUITS--;
-            }
-
+            let hasEaten = isFruit(gameMap[newHead.x][newHead.y]);
+            
             /**
              * HEAD
              */
             gameMap[newHead.x][newHead.y] = newHead; // Agrego la nueva cabeza al mapa.
-            newHead.prev = this.head;
-            this.head.next = newHead;
-            newHead.prev = this.head;
+            this.head.next = newHead; // Actualizo la cabeza de la serpiente.
             this.head = newHead;
-
+            
             /**
              * TAIL
              */
-            gameMap[this.tail.x][this.tail.y] = null; // Borro la cola vieja del mapa.
-            this.tail = this.tail.next || this.tail;
-            this.tail.prev = null;
- 
+            if(hasEaten){
+                EXISTING_FRUITS--;
+            } else {
+                // Si no comio, elimino la cola.
+                gameMap[this.tail.x][this.tail.y] = null;
+                this.tail = this.tail.next as SnakeBody;
+            }
         },
         changeDirection: function(direction: Direction){ 
             if(this.direction == 'up' && direction == 'down') return;
@@ -92,41 +95,34 @@ function buildSnake(position: {x: number, y: number} = { x: Math.floor(WIDTH/2),
     };
 }
 
-let snake = buildSnake({x: 0, y:0 }, "down" );
+let snake = buildSnake();
 
 let snakeChallenge = document.getElementById('snakeChallenge') as HTMLDivElement;
 
-function renderSnake(){
-    snake.move();
-    let current: SnakeBody | null = snake.head;
-    // Creo un nuevo mapa.
-    while(current !== null){
-        if(current.x < 0 || current.x >= WIDTH || current.y < 0 || current.y >= HEIGHT) return GAME_OVER = true;
+function createFruit(): void {
+    if(EXISTING_FRUITS > 0) return;
 
-        gameMap[current.x][current.y] = current;
-        current = current.prev;
-    }
-
-}
-
-function renderFruit(): void {
     let x = Math.floor(Math.random() * WIDTH);
     let y = Math.floor(Math.random() * HEIGHT);
 
-    if(gameMap[x][y] !== null) return renderFruit();
-    if(EXISTING_FRUITS > 0) return;
+    if(gameMap[x][y] !== null) return createFruit();
 
-    gameMap[x][y] = {x, y};
+    gameMap[x][y] = {x, y, type: "fruit"};
     EXISTING_FRUITS++;
 }
 
 function renderMap(){
+    // Limpio la pantalla
     snakeChallenge.innerHTML = '';
-    // Basicamente recorro todo el mapa.
-    renderSnake();
-    renderFruit();
 
+    // Muevo la serpiente
+    snake.move();
+    // Creo una fruta, si es necesario.
+    createFruit();
+    
     if(GAME_OVER) return snakeChallenge.innerHTML = '<h1>GAME OVER</h1><h2>Press F5 to restart</h2>';
+
+    // Renderizo el mapa.
     for(let i = 0; i < HEIGHT; i++){
         let row = document.createElement('div');
         row.classList.add('row');

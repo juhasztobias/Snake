@@ -5,52 +5,54 @@ let HEIGHT = 30;
 let REFRESH_RATE = 50; // 50ms
 let GAME_OVER = false;
 let EXISTING_FRUITS = 0;
-let isSnakeBody = (obj) => obj && obj.x !== undefined && obj.y !== undefined && obj.next !== undefined && obj.prev !== undefined;
-let isFruit = (obj) => obj && obj.x !== undefined && obj.y !== undefined && !isSnakeBody(obj);
+let isSnakeBody = (obj) => obj && obj.type === 'snake';
+let isFruit = (obj) => obj && obj.type === 'fruit';
 let gameMap = Array.from({ length: WIDTH }, () => Array.from({ length: HEIGHT }, () => null));
-function buildSnake(position = { x: Math.floor(WIDTH / 2), y: Math.floor(HEIGHT / 2) }, direction = 'right') {
+function buildSnake(position = { x: Math.floor(WIDTH / 2), y: Math.floor(HEIGHT / 2) }) {
     let arr = [];
-    for (let i = 0; i < 3; i++)
-        arr.push({ x: position.x + i, y: position.y, next: null, prev: arr[i - 1] || null });
-    for (let i = 0; i < 3; i++)
-        arr[i].next = arr[i + 1] || null;
+    for (let i = 0; i < 3; i++) {
+        arr.push({ x: position.x + i, y: position.y, type: 'snake', next: null });
+        gameMap[position.x + i][position.y] = arr[i]; // Agrego la serpiente al mapa.
+    }
+    for (let i = 0; i < 2; i++)
+        arr[i].next = arr[i + 1];
     return {
         head: arr[2],
         tail: arr[0],
-        direction: direction,
+        direction: 'right',
         length: 3,
         move: function () {
-            let newHead;
+            let newHead = { x: this.head.x, y: this.head.y, type: 'snake', next: null };
             if (this.direction == "right")
-                newHead = { x: this.head.x + 1, y: this.head.y, next: null, prev: null };
+                newHead.x++;
             else if (this.direction == "left")
-                newHead = { x: this.head.x - 1, y: this.head.y, next: null, prev: null };
+                newHead.x--;
             else if (this.direction == "up")
-                newHead = { x: this.head.x, y: this.head.y - 1, next: null, prev: null };
+                newHead.y--;
             else if (this.direction == "down")
-                newHead = { x: this.head.x, y: this.head.y + 1, next: null, prev: null };
+                newHead.y++;
             else
                 throw new Error('Invalid direction');
             if (isSnakeBody(gameMap[newHead.x][newHead.y]))
                 return GAME_OVER = true;
-            if (isFruit(gameMap[newHead.x][newHead.y])) {
-                this.tail = { x: this.tail.x, y: this.tail.y, next: this.tail, prev: null };
-                EXISTING_FRUITS--;
-            }
+            let hasEaten = isFruit(gameMap[newHead.x][newHead.y]);
             /**
              * HEAD
              */
             gameMap[newHead.x][newHead.y] = newHead; // Agrego la nueva cabeza al mapa.
-            newHead.prev = this.head;
-            this.head.next = newHead;
-            newHead.prev = this.head;
+            this.head.next = newHead; // Actualizo la cabeza de la serpiente.
             this.head = newHead;
             /**
              * TAIL
              */
-            gameMap[this.tail.x][this.tail.y] = null; // Borro la cola vieja del mapa.
-            this.tail = this.tail.next || this.tail;
-            this.tail.prev = null;
+            if (hasEaten) {
+                EXISTING_FRUITS--;
+            }
+            else {
+                // Si no comio, elimino la cola.
+                gameMap[this.tail.x][this.tail.y] = null;
+                this.tail = this.tail.next;
+            }
         },
         changeDirection: function (direction) {
             if (this.direction == 'up' && direction == 'down')
@@ -65,36 +67,30 @@ function buildSnake(position = { x: Math.floor(WIDTH / 2), y: Math.floor(HEIGHT 
         },
     };
 }
-let snake = buildSnake({ x: 0, y: 0 }, "down");
+let snake = buildSnake();
+let secondSnake = buildSnake({ x: 10, y: 10 });
 let snakeChallenge = document.getElementById('snakeChallenge');
-function renderSnake() {
-    snake.move();
-    let current = snake.head;
-    // Creo un nuevo mapa.
-    while (current !== null) {
-        if (current.x < 0 || current.x >= WIDTH || current.y < 0 || current.y >= HEIGHT)
-            return GAME_OVER = true;
-        gameMap[current.x][current.y] = current;
-        current = current.prev;
-    }
-}
-function renderFruit() {
+function createFruit() {
+    if (EXISTING_FRUITS > 0)
+        return;
     let x = Math.floor(Math.random() * WIDTH);
     let y = Math.floor(Math.random() * HEIGHT);
     if (gameMap[x][y] !== null)
-        return renderFruit();
-    if (EXISTING_FRUITS > 0)
-        return;
-    gameMap[x][y] = { x, y };
+        return createFruit();
+    gameMap[x][y] = { x, y, type: "fruit" };
     EXISTING_FRUITS++;
 }
 function renderMap() {
+    // Limpio la pantalla
     snakeChallenge.innerHTML = '';
-    // Basicamente recorro todo el mapa.
-    renderSnake();
-    renderFruit();
+    // Muevo la serpiente
+    snake.move();
+    secondSnake.move();
+    // Creo una fruta, si es necesario.
+    createFruit();
     if (GAME_OVER)
         return snakeChallenge.innerHTML = '<h1>GAME OVER</h1><h2>Press F5 to restart</h2>';
+    // Renderizo el mapa.
     for (let i = 0; i < HEIGHT; i++) {
         let row = document.createElement('div');
         row.classList.add('row');
@@ -122,4 +118,12 @@ document.addEventListener('keydown', (e) => {
         snake.changeDirection('left');
     else if (e.key == 'ArrowRight')
         snake.changeDirection('right');
+    if (e.key == 'w')
+        secondSnake.changeDirection('up');
+    else if (e.key == 's')
+        secondSnake.changeDirection('down');
+    else if (e.key == 'a')
+        secondSnake.changeDirection('left');
+    else if (e.key == 'd')
+        secondSnake.changeDirection('right');
 });
