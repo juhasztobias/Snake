@@ -1,0 +1,43 @@
+body{
+    margin: 0;
+    padding: 0;
+    display: grid;
+    place-items: center;
+
+    height: 100vh;
+}
+
+#snakeChallenge {
+    width: fit-content;
+    display: grid;
+    background-color: black;
+    color: wheat;
+    text-align: center;
+    border: 1px solid #ccc4;
+    border-radius: 0.4rem;
+    padding: .2rem;
+    box-shadow: 0 0 0.4rem #0004;
+}
+
+.row{
+    /* background-color: red; */
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+
+.cell{
+    width: 1rem;
+    height: 1rem;
+    background-color: white;
+}
+
+.snake {
+    background-color: green;
+}
+
+.fruit {
+    background-color: red;
+    border-radius: 100%;
+}
